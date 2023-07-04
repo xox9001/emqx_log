@@ -1,0 +1,6 @@
+{application,emqx_onlineLog,
+             [{description,"emqx online and offline log"},
+              {vsn,"1.0"},
+              {applications,[kernel,stdlib]},
+              {registered,[]},
+              {modules,[emqx_onlineLog]}]}.
