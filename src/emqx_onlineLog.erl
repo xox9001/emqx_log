@@ -8,7 +8,7 @@
 %% api callbacks
 -export([start_link/0, start_link/2
          , send/1, send/2, send/3
-		,rotate/0
+		,rotate/1
 		,closeFd/1
 		,return_fill/1
 		]).
@@ -40,8 +40,8 @@ send(Name, Msg, Opts) when is_list(Msg), is_list(Opts) ->
 %% async
 	gen_server:cast(Name, {send, Msg}).
 
-rotate()->
-	gen_server:call(?MODULE, {rotate},20000).
+rotate(Name)->
+	gen_server:call(Name, {rotate},20000).
 
 %%====================================================================
 %% gen_server callbacks
@@ -160,7 +160,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 start_http() ->
-    spawn(fun () -> {ok, Sock} = gen_tcp:listen(7777, [{active, false}]), 
+    spawn(fun () -> {ok, Sock} = gen_tcp:listen(9981, [{active, false}]), 
                     accept(Sock) end).
 
 accept(S) ->
@@ -170,7 +170,8 @@ accept(S) ->
 	accept(S).
 
 handler(Conn) ->
-	rotate(),
+	%% TODO: get rotate Param from Request
+	rotate(emqx_log),
 	gen_tcp:send(Conn,resp()),
 	gen_tcp:close(Conn).
 
