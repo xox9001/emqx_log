@@ -13,6 +13,13 @@
 		,return_fill/1
 		]).
 
+-rest_api(#{ name => rotate
+           , method => 'GET'
+           , path => "/onlineLog/rotate"
+           , func => rotate
+           , descr => "/onlineLog/rotate"
+           }).
+
 -record(state, {socket, log_path}).
 
 %% -define(DEFAULT_FACILITY, local0).
@@ -38,9 +45,8 @@ send(Name, Msg, Opts) when is_list(Msg), is_list(Opts) ->
 %% async
 	gen_server:cast(Name, {send, Msg}).
 
-rotate(Name)->
-	gen_server:call(Name, {rotate},20000).
-
+rotate()->
+	gen_server:call(?MODULE, {rotate},20000).
 
 %%====================================================================
 %% gen_server callbacks
