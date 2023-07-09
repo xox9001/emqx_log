@@ -9,6 +9,8 @@
 -export([start_link/0, start_link/2
          , send/1, send/2, send/3
 		,rotate/1
+		,closeFd/1
+		,return_fill/1
 		]).
 
 -record(state, {socket, log_path}).
@@ -37,7 +39,7 @@ send(Name, Msg, Opts) when is_list(Msg), is_list(Opts) ->
 	gen_server:cast(Name, {send, Msg}).
 
 rotate(Name)->
-	gen_server:call(Name, {rotate}).
+	gen_server:call(Name, {rotate},20000).
 
 
 %%====================================================================
@@ -77,20 +79,36 @@ handle_call({send,Msg},_From, #state{socket=Socket}=State) ->
 
 handle_call({rotate},_From, #state{socket=OFD,log_path=Path}) ->
 	{{Year, Month, Day}, {Hour, Minite, Second}} = calendar:local_time(),
-	NewLogPath =  lists:flatten(io_lib:format("~s-~w~w~w~w~w~w", [Path,Year,Month,Day,Hour,Minite,Second])),
+	NewLogPath = io_lib:format("~s-~w~s~s~s~s~s", [Path,Year,return_fill(Month),return_fill(Day),return_fill(Hour),return_fill(Minite),return_fill(Second)]),
 	case file:open(NewLogPath, [ write, {delayed_write,104857600,3000}, binary]) of
 		{ok, FD} ->
-			spawn(?MODULE,closeFd,[OFD]),
-			{reply,ok, #state{socket = FD}};
+			spawn(emqx_onlineLog,closeFd,[OFD]),
+			io:format("LogRotateSuccess:~w,~w,~s~n",[FD,OFD,NewLogPath]),
+		%%	io:format(erlang:is_process_alive(Pid)),
+		%%	timer:sleep(10000),
+		%%	io:format(erlang:is_process_alive(Pid)),
+			{reply,ok, #state{socket = FD,log_path=Path}};
 		{error, Reason} ->
-            {reply,error, Reason}
+			io:format("open fail:~p~n",[Reason]),
+            {reply,stop, Reason}
 	end.
 
+return_fill(T)->
+	if 
+		T < 10 -> io_lib:format("0~w", [T]);
+		true -> io_lib:format("~w", [T])
+	end.
+		
 %%关闭文件
 closeFd(FD) ->
-	Packet = list_to_binary(["[Close]Rotate Log"]),
+%%	io:format("closeFd:~w~n",[calendar:local_time()]),
+	timer:sleep(10000),
+	io:format("closeFd_At:~w~n",[calendar:local_time()]),
+%%	io:format("closeFd:~w~n",[calendar:local_time()]),
+%%	io:format("closeFd:~w~n",[FD]),
+	Packet = list_to_binary(["[Close]Rotate_Log\n"]),
 	file:write(FD, Packet),
-	timer:sleep(10),
+	file:sync(FD),
 	file:close(FD).
 
 %%--------------------------------------------------------------------
