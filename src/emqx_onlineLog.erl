@@ -27,9 +27,6 @@ start_link(Name,LogPath) when is_atom(Name) ->
 send(Msg) ->
     gen_server:call(?MODULE,{send,Msg}).
 
-send(Msg, Opts) when is_list(Msg), is_list(Opts) ->
-    send(?MODULE, Msg, []);
-
 send(Name, Msg) when is_list(Msg) ->
     send(Name, Msg, []).
 
@@ -91,6 +88,8 @@ handle_call({rotate},_From, #state{socket=OFD,log_path=Path}) ->
 
 %%关闭文件
 closeFd(FD) ->
+	Packet = list_to_binary(["[Close]Rotate Log"]),
+	file:write(FD, Packet),
 	timer:sleep(10),
 	file:close(FD).
 
