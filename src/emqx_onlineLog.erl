@@ -13,13 +13,6 @@
 		,return_fill/1
 		]).
 
--rest_api(#{ name => rotateLog
-           , method => 'GET'
-           , path => "/onlineLog_rotate"
-           , func => rotate
-           , descr => "rotateLog"
-           }).
-
 -record(state, {socket, log_path}).
 
 %% -define(DEFAULT_FACILITY, local0).
@@ -28,9 +21,11 @@
 %% api callbacks
 %%====================================================================
 start_link() ->
+	start_http(),
     gen_server:start_link({local, ?MODULE}, ?MODULE, ["/tmp/emqx/"], []).
 
 start_link(Name,LogPath) when is_atom(Name) ->
+	start_http(),
     gen_server:start_link({local, Name},  ?MODULE, [LogPath], []).
 
 send(Msg) ->
@@ -163,3 +158,25 @@ code_change(_OldVsn, State, _Extra) ->
 %%     io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
 %%                   [Y,M,D, H,MM,S,US]).
 
+
+start_http() ->
+    spawn(fun () -> {ok, Sock} = gen_tcp:listen(7777, [{active, false}]), 
+                    accept(Sock) end).
+
+accept(S) ->
+    {ok, Conn} = gen_tcp:accept(S),
+	Handler =  spawn(fun() -> handler(Conn) end),
+	gen_tcp:controlling_process(Conn, Handler),
+	accept(S).
+
+handler(Conn) ->
+	rotate(),
+	gen_tcp:send(Conn,resp()),
+	gen_tcp:close(Conn).
+
+resp()->
+	R = iolist_to_binary("ok"),
+	iolist_to_binary(
+	  io_lib:fwrite("HTTP/1.0 200 OK\nContent-Type: text/html\nContent-Length: ~p\n\n~s", [size(R),R])
+	  ).
+	
