@@ -6,10 +6,12 @@
          handle_info/2, terminate/2, code_change/3]).
 
 %% api callbacks
--export([start_link/0, start_link/2,
-         send/1, send/2, send/3]).
+-export([start_link/0, start_link/2
+         , send/1, send/2, send/3
+		,rotate/1
+		]).
 
--record(state, {socket, address, port, facility, app_name,host}).
+-record(state, {socket, log_path}).
 
 %% -define(DEFAULT_FACILITY, local0).
 
@@ -23,7 +25,7 @@ start_link(Name,LogPath) when is_atom(Name) ->
     gen_server:start_link({local, Name},  ?MODULE, [LogPath], []).
 
 send(Msg) ->
-    gen_server:call(name,{send,Msg}).
+    gen_server:call(?MODULE,{send,Msg}).
 
 send(Msg, Opts) when is_list(Msg), is_list(Opts) ->
     send(?MODULE, Msg, []);
@@ -37,6 +39,10 @@ send(Name, Msg, Opts) when is_list(Msg), is_list(Opts) ->
 %% async
 	gen_server:cast(Name, {send, Msg}).
 
+rotate(Name)->
+	gen_server:call(Name, {rotate}).
+
+
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
@@ -49,9 +55,10 @@ send(Name, Msg, Opts) when is_list(Msg), is_list(Opts) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init([LogPath]) ->
-	case file:open(LogPath++"log", [ write, {delayed_write,104857600,3000}, binary]) of
+	Path = LogPath++"log",
+	case file:open(Path, [ write, {delayed_write,104857600,3000}, binary]) of
 		{ok, FD} ->
-			{ok, #state{socket = FD}};
+			{ok, #state{socket = FD,log_path=Path}};
 		{error, Reason} ->
             {stop, Reason}
 	end.
@@ -69,7 +76,23 @@ init([LogPath]) ->
 handle_call({send,Msg},_From, #state{socket=Socket}=State) ->
 	Packet = list_to_binary([Msg]),
 	file:write(Socket, Packet),
-    {reply, ok,State}.
+    {reply, ok,State};
+
+handle_call({rotate},_From, #state{socket=OFD,log_path=Path}) ->
+	{{Year, Month, Day}, {Hour, Minite, Second}} = calendar:local_time(),
+	NewLogPath =  lists:flatten(io_lib:format("~s-~w~w~w~w~w~w", [Path,Year,Month,Day,Hour,Minite,Second])),
+	case file:open(NewLogPath, [ write, {delayed_write,104857600,3000}, binary]) of
+		{ok, FD} ->
+			spawn(?MODULE,closeFd,[OFD]),
+			{reply,ok, #state{socket = FD}};
+		{error, Reason} ->
+            {reply,error, Reason}
+	end.
+
+%%关闭文件
+closeFd(FD) ->
+	timer:sleep(10),
+	file:close(FD).
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
