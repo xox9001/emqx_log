@@ -8,16 +8,16 @@
 %% api callbacks
 -export([start_link/0, start_link/2
          , send/1, send/2, send/3
-		,rotate/1
+		,rotate/0
 		,closeFd/1
 		,return_fill/1
 		]).
 
--rest_api(#{ name => rotate
+-rest_api(#{ name => rotateLog
            , method => 'GET'
-           , path => "/onlineLog/rotate"
+           , path => "/onlineLog_rotate"
            , func => rotate
-           , descr => "/onlineLog/rotate"
+           , descr => "rotateLog"
            }).
 
 -record(state, {socket, log_path}).
